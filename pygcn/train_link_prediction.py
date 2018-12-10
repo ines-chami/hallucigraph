@@ -50,6 +50,7 @@ args = parser.parse_args()
 def gae_for(args):
     print("Using {} dataset".format(args.dataset))
     adj, features, _, _, _, _ = load_data(dataset_str=args.dataset)
+    features = torch.FloatTensor(np.array(features.todense()))
     n_nodes, feat_dim = features.shape
 
     # Store original adjacency matrix (without diagonal entries) for later

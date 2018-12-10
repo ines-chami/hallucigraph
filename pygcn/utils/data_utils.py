@@ -51,12 +51,10 @@ def load_data(dataset_str, data_path='/Users/ineschami/hubris-gcnn-survey18/thir
 
     features = sp.vstack((allx, tx)).tolil()
     features[test_idx_reorder, :] = features[test_idx_range, :]
-    # features = normalize(features)
-    features = torch.FloatTensor(np.array(features.todense()))
 
     labels = np.vstack((ally, ty))
     labels[test_idx_reorder, :] = labels[test_idx_range, :]
-    labels = torch.LongTensor(np.argmax(labels, 1))
+    labels = np.argmax(labels, 1)
 
     idx_test = test_idx_range.tolist()
     idx_train = list(range(len(y)))

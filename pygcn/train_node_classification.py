@@ -47,6 +47,10 @@ args.cuda = not args.no_cuda and torch.cuda.is_available()
 
 # Load data
 adj, features, labels, idx_train, idx_val, idx_test = load_data(dataset_str=args.dataset)
+features = normalize(features)
+features = torch.FloatTensor(np.array(features.todense()))
+labels = torch.LongTensor(labels)
+
 adj = normalize(adj + sp.eye(adj.shape[0]))
 adj = sparse_mx_to_torch_sparse_tensor(adj)
 
@@ -123,7 +127,7 @@ print("Optimization Finished!")
 print("Total time elapsed: {:.4f}s".format(time.time() - t_total))
 if not best_loss_test:
     # Testing
-    loss_test, acc_test = test()
+    best_loss_test, best_acc_test = test()
 print("Test set results:",
-      "loss= {:.4f}".format(loss_test.item()),
-      "accuracy= {:.4f}".format(acc_test.item()))
+      "loss= {:.4f}".format(best_loss_test.item()),
+      "accuracy= {:.4f}".format(best_acc_test.item()))
