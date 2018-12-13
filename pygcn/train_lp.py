@@ -106,7 +106,7 @@ def gae_for(args):
             if ap_curr > best_val_ap:  # and roc_curr > best_val_roc:
                 roc_score, ap_score = get_roc_score(hidden_emb, adj_orig, test_edges, test_edges_false)
             if args.save:
-                np.save(os.path.join('reconstructions', '{}-{}-{}'.format(args.dataset, args.model, args.hidden)),
+                np.save(os.path.join('reconstructions', '{}-{}-{}-rec'.format(args.dataset, args.model, args.hidden)),
                         sigmoid(hidden_emb.dot(hidden_emb.T)), )
             best_val_ap = ap_curr
             best_val_roc = roc_curr
@@ -122,6 +122,10 @@ def gae_for(args):
         roc_score, ap_score = get_roc_score(hidden_emb, adj_orig, test_edges, test_edges_false)
     print('Test ROC score: ' + str(roc_score))
     print('Test AP score: ' + str(ap_score))
+    if args.save:
+        np.save(os.path.join('reconstructions', '{}-{}-{}-orig'.format(args.dataset, args.model, args.hidden)),
+                        sigmoid(hidden_emb.dot(hidden_emb.T)), )
+
 
 
 if __name__ == '__main__':
