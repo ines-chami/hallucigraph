@@ -14,7 +14,7 @@ def loss_function(preds, labels, mu, logvar, n_nodes, norm, pos_weight):
     return cost + KLD
 
 
-def loss_function_with_masking(preds, labels, mu, logvar, n_nodes, norm, adj_mask, pos_weight):
+def loss_function_with_masking(preds, labels, adj_mask, mu, logvar, n_nodes, norm, pos_weight):
     """Link prediction loss with weighted sigmoid cross entropy."""
     masked_preds = preds - (10e8 * adj_mask)
     masked_labels = labels
@@ -22,3 +22,7 @@ def loss_function_with_masking(preds, labels, mu, logvar, n_nodes, norm, adj_mas
     KLD = -0.5 / n_nodes * torch.mean(torch.sum(
             1 + 2 * logvar - mu.pow(2) - logvar.exp().pow(2), 1))
     return cost + KLD
+
+
+def rec_loss(preds, labels, pos_weight):
+    return F.binary_cross_entropy_with_logits(preds, labels, pos_weight=pos_weight)

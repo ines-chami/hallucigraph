@@ -129,7 +129,7 @@ def sparse_to_tuple(sparse_mx):
     return coords, values, shape
 
 
-def mask_test_edges(adj):
+def mask_test_edges(adj, drop_prop):
     # Function to build test set with 10% positive links
     # NOTE: Splits are randomized and results might slightly deviate from reported numbers in the paper.
     # TODO: Clean up.
@@ -144,9 +144,8 @@ def mask_test_edges(adj):
     adj_tuple = sparse_to_tuple(adj_triu)
     edges = adj_tuple[0]
     edges_all = sparse_to_tuple(adj)[0]
-    num_test = int(np.floor(edges.shape[0] / 10.))
-    num_val = int(np.floor(edges.shape[0] / 20.))
-
+    num_test = int(np.floor(edges.shape[0] * drop_prop * 0.5 / 100))
+    num_val = int(np.floor(edges.shape[0] * drop_prop * 0.5 / 100))
     all_edge_idx = list(range(edges.shape[0]))
     np.random.shuffle(all_edge_idx)
     val_edge_idx = all_edge_idx[:num_val]
@@ -210,3 +209,77 @@ def mask_test_edges(adj):
     # NOTE: these edge lists only contain single direction of edge!
     return adj_train, train_edges, val_edges, val_edges_false, test_edges, test_edges_false
 
+
+def mask_l_u_edges(adj, l_indices, u_indices):
+    def ismember(a, b, tol=5):
+        rows_close = np.all(np.round(a - b[:, None], tol) == 0, axis=-1)
+        return np.any(rows_close)
+
+    adj = adj - sp.dia_matrix((adj.diagonal()[np.newaxis, :], [0]), shape=adj.shape)
+    adj.eliminate_zeros()
+    # Check that diag is zero:
+    assert np.diag(adj.todense()).sum() == 0
+
+    adj_triu = sp.triu(adj)
+    adj_tuple = sparse_to_tuple(adj_triu)
+    all_edges = adj_tuple[0]
+    train_edges = []
+    test_edges = []
+    val_edges = []
+    adj_train = adj
+
+    adj_mask = np.zeros((adj.shape[0], adj.shape[0]))
+    for i in l_indices:
+        for j in u_indices:
+            adj_mask[i, j] = 1
+            adj_mask[j, i] = 1
+    for i, j in all_edges:
+        if i in l_indices and j in u_indices:
+            test_edges.append([i, j])
+            adj_train[i, j], adj_train[j, i] = 0, 0
+            # adj_mask[i, j], adj_mask[j, i] = 1, 1
+        else:
+            # add to dev or train set
+            random = np.random.uniform(0, 1)
+            if random < 0.1:
+                val_edges.append([i, j])
+                adj_train[i, j], adj_train[j, i] = 0, 0
+                # adj_mask[i, j], adj_mask[j, i] = 1, 1
+            else:
+                train_edges.append([i, j])
+
+    adj_train.eliminate_zeros()
+
+    val_edges_false = []
+    while len(val_edges_false) < len(val_edges):
+        i = np.random.randint(0, adj.shape[0])
+        j = np.random.randint(0, adj.shape[0])
+        if i > j:
+            i, j = j, i
+        if i in l_indices and j in u_indices:
+            continue
+        if i == j:
+            continue
+        if ismember([i, j], all_edges):
+            continue
+        if val_edges_false:
+            if ismember([i, j], np.array(val_edges_false)):
+                continue
+        val_edges_false.append([i, j])
+        # adj_mask[i, j], adj_mask[j, i] = 1, 1
+
+    test_edges_false = []
+    while len(test_edges_false) < len(test_edges):
+        i = np.random.choice(l_indices)
+        j = np.random.choice(u_indices)
+        if i == j:
+            continue
+        if ismember([i, j], all_edges):
+            continue
+        if test_edges_false:
+            if ismember([i, j], np.array(test_edges_false)):
+                continue
+        test_edges_false.append([i, j])
+        # adj_mask[i, j], adj_mask[j, i] = 1, 1
+
+    return adj_train, adj_mask, train_edges, val_edges, val_edges_false, test_edges, test_edges_false

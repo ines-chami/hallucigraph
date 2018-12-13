@@ -20,45 +20,48 @@ class GCN(nn.Module):
 
 
 class Hallucigraph(nn.Module):
-    def __init__(self, nfeat, nhid, nclass, dropout, autoregressive_scalar=0.5):
+    def __init__(self, nfeat, nhid, nclass, dropout, autoregressive_scalar=0.5, temp=0.25):
         super(Hallucigraph, self).__init__()
         self.dropout = dropout
         self.autoregressive_scalar = autoregressive_scalar
-        self.gc1 = GraphConvolution(nfeat, nhid, dropout, act=F.relu)
-        self.gc2 = GraphConvolution(nfeat, nhid, dropout, act=lambda x: x)
+        self.temp = temp
+        self.gc1 = GraphConvolution(nfeat, nhid, dropout=0, act=F.relu)
+        self.gc2 = GraphConvolution(nhid, nhid, dropout=0, act=lambda x: x)
         self.gc3 = GraphConvolution(nhid, nclass, dropout, act=lambda x: x)
         self.dc = InnerProductDecoder(dropout, act=lambda x: x)
         self.gd1 = GraphConvolution(nhid, nhid, dropout, act=F.relu)
         self.gd2 = GraphConvolution(nfeat, nhid, dropout, act=F.relu)
-        self.gd3 = GraphConvolution(nhid, nclass, dropout, act=lambda x: x)
+        self.gd3 = GraphConvolution(nhid, nhid, dropout, act=lambda x: x)
+        self.gd4 = GraphConvolution(nhid, nclass, dropout, act=lambda x: x)
 
     def encode(self, x, adj):
-        return self.gc1(x, adj), self.gc2(x, adj)
+        return self.gc2(self.gc1(x, adj), adj)
 
     def _forward(self, x, adj):
-        mu, logvar = self.encode(x, adj)
-        z0 = reparameterize(self.training, mu, logvar)
+        z0 = self.gc1(x, adj)
+        # mu, logvar = self.encode(x, adj)
+        # z0 = reparameterize(self.training, mu, logvar)
         preds0 = self.gc3(z0, adj)
         adj_rec = torch.sigmoid(torch.mm(z0, z0.t()))
         adj_rec = sample_graph(adj_rec)
         adj_norm = normalize_adj(adj_rec)
-        z1 = self.gd1.forward(z0, adj_norm)
-        z2 = self.gd2.forward(x, adj_norm)
-        preds1 = self.gd3.forward(z1 + z2, adj_norm)
+        z1 = self.gd1(z0, adj_norm)
+        z2 = self.gd2(x, adj_norm)
+        preds1 = self.gd4(z1 + z2, adj_norm)
         preds = (1 - self.autoregressive_scalar) * preds0 + self.autoregressive_scalar * preds1
         return F.log_softmax(preds, dim=1)  # , mu, logvar
 
     def forward(self, x, adj):
-        mu, logvar = self.encode(x, adj)
-        z0 = reparameterize(self.training, mu, logvar)
-        adj_rec = torch.sigmoid(torch.mm(z0, z0.t()))
-        adj_rec = sample_graph(adj_rec)
+        z0 = self.encode(x, adj)
+        adj_scores = torch.mm(z0, z0.t())
+        adj_rec = sample_graph(torch.sigmoid(adj_scores), temp=self.temp, hard=False)
         adj_norm = normalize_adj(adj_rec)
         z1 = self.gd1.forward(z0, adj_norm)
         z2 = self.gd2.forward(x, adj_norm)
-        z = (1 - self.autoregressive_scalar) * z0 + self.autoregressive_scalar * (z1 + z2)
+        z3 = self.gd3(z1 + z2, adj_norm)
+        z = (1 - self.autoregressive_scalar) * z0 + self.autoregressive_scalar * z3
         preds = self.gc3(z, adj)
-        return F.log_softmax(preds, dim=1)  # , mu, logvar
+        return adj_scores, F.log_softmax(preds, dim=1)
 
 
 class VGAE(nn.Module):
