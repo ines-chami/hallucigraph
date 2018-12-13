@@ -3,6 +3,7 @@ from __future__ import print_function
 
 import argparse
 import os
+import pickle as pkl
 import sys
 import time
 
@@ -124,8 +125,15 @@ def gae_for(args):
     print('Test AP score: ' + str(ap_score))
     if args.save:
         np.save(os.path.join('reconstructions', '{}-{}-{}-orig'.format(args.dataset, args.model, args.hidden)),
-                        sigmoid(hidden_emb.dot(hidden_emb.T)), )
-
+                adj_orig.toarray())
+        pkl.dump(test_edges,
+                 open(os.path.join('reconstructions',
+                                   '{}-{}-{}-test-edges'.format(args.dataset, args.model, args.hidden)), 'wb'),
+                 )
+        pkl.dump(test_edges_false,
+                 open(os.path.join('reconstructions',
+                                   '{}-{}-{}-test-edges-false'.format(args.dataset, args.model, args.hidden)), 'wb'),
+                 )
 
 
 if __name__ == '__main__':

@@ -22,7 +22,7 @@ parser.add_argument('--fastmode', action='store_true', default=False,
 parser.add_argument('--seed', type=int, default=42, help='Random seed.')
 parser.add_argument('--epochs', type=int, default=10000,
                     help='Number of epochs to train.')
-parser.add_argument('--patience', type=int, default=100,
+parser.add_argument('--patience', type=int, default=50,
                     help='Patience for early stopping.')
 parser.add_argument('--lr', type=float, default=0.005,
                     help='Initial learning rate.')
@@ -38,10 +38,15 @@ parser.add_argument('--model', type=str, default='GCN',
                     help='Model to use.')
 parser.add_argument('--drop-prop', type=float, default=0,
                     help='Proportion of edges to remove.')
+parser.add_argument('--adj-path', type=str, default=None,
+                    help='Path to the adjacency matrix to use.')
+parser.add_argument('--adj-threshold', type=float, default=0.95,
+                    help='Threshold to keep edges.')
+parser.add_argument('--adj-weight', type=float, default=0.5,
+                    help='weight of LU edhes we are adding.')
 
 args = parser.parse_args()
 args.cuda = not args.no_cuda and torch.cuda.is_available()
-
 # np.random.seed(args.seed)
 # torch.manual_seed(args.seed)
 # if args.cuda:
@@ -57,6 +62,10 @@ l_indices = idx_train
 u_indices = [i for i in range(adj.shape[0]) if i not in l_indices]
 adj, adj_mask, train_edges, val_edges, val_edges_false, test_edges, test_edges_false = mask_l_u_edges(
         adj, l_indices, u_indices)
+if args.adj_path:
+    rec = np.load(args.adj_path)
+    adj = adj.toarray() + args.adj_weight * ((adj_mask * rec) > args.adj_threshold)
+    adj = sp.coo_matrix(adj)
 adj = normalize(adj + sp.eye(adj.shape[0]))
 adj = sparse_mx_to_torch_sparse_tensor(adj)
 
